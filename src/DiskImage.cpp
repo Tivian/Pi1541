@@ -347,7 +347,11 @@ bool DiskImage::OpenD71(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 		for (unsigned halfTrackIndex = 0; halfTrackIndex < D71_HALF_TRACK_COUNT; ++halfTrackIndex)
 		{
 			unsigned char track = (halfTrackIndex >> 1);
+#if defined(EXPERIMENTALZERO)
+			unsigned char* dest = &tracksD81[(halfTrackIndex << 11) + (headIndex << 10)];
+#else
 			unsigned char* dest = tracksD81[halfTrackIndex][headIndex];
+#endif
 
 			trackLengths[halfTrackIndex] = SectorsPerTrack[track] * GCR_SECTOR_LENGTH;
 
@@ -487,8 +491,13 @@ bool DiskImage::OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 		unsigned index;
 
 		trackUsed[trackIndex] = true;
+#if defined(EXPERIMENTALZERO)
+		memset(&trackD81SyncBits[(trackIndex << 11) + (0 << 10)], 0, MAX_TRACK_LENGTH >> 3);
+		memset(&trackD81SyncBits[(trackIndex << 11) + (1 << 10)], 0, MAX_TRACK_LENGTH >> 3);
+#else
 		memset(trackD81SyncBits[trackIndex][0], 0, MAX_TRACK_LENGTH >> 3);
 		memset(trackD81SyncBits[trackIndex][1], 0, MAX_TRACK_LENGTH >> 3);
+#endif
 //32x	4e
 // For 10 sectors
 //		12x	00	// SYNC
@@ -594,7 +603,11 @@ bool DiskImage::OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 		// (sectors 20 - 39 are on physical side 2)
 		for (headIndex = 0; headIndex < 2; ++headIndex)
 		{
+#if defined(EXPERIMENTALZERO)
+			unsigned char* dest = &tracksD81[(trackIndex << 11) + (headIndex << 10)];
+#else
 			unsigned char* dest = tracksD81[trackIndex][headIndex];
+#endif
 			memset(dest, 0x4e, 32); dest += 32;
 			for (physicalSectorIndex = 0; physicalSectorIndex < physicalSectors; ++physicalSectorIndex)
 			{
@@ -602,7 +615,11 @@ bool DiskImage::OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 
 				memset(dest, 0, 12); dest += 12;	// SYNC - This sequence provides to the DPLL enough time to adjust the frequency and center the inspection window.
 
+#if defined(EXPERIMENTALZERO)
+				headPos = dest - &tracksD81[(trackIndex << 11) + (headIndex << 10)];
+#else
 				headPos = dest - tracksD81[trackIndex][headIndex];
+#endif
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
@@ -625,7 +642,11 @@ bool DiskImage::OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 
 				memset(dest, 0, 12); dest += 12;	// SYNC
 
+#if defined(EXPERIMENTALZERO)
+				headPos = dest - &tracksD81[(trackIndex << 11) + (headIndex << 10)];
+#else
 				headPos = dest - tracksD81[trackIndex][headIndex];
+#endif
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
 				SetD81SyncBit(trackIndex, headIndex, headPos++, true);
@@ -648,7 +669,11 @@ bool DiskImage::OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsig
 				memset(dest, 0x4e, 35); dest += 35;
 			}
 
+#if defined(EXPERIMENTALZERO)
+			trackLengths[trackIndex] = dest - &tracksD81[(trackIndex << 11) + (headIndex << 10)];
+#else
 			trackLengths[trackIndex] = dest - tracksD81[trackIndex][headIndex];
+#endif
 		}
 	}
 
@@ -682,7 +707,11 @@ bool DiskImage::WriteD81()
 				// (sectors 20 - 39 are on physical side 2)
 				for (unsigned headIndex = 0; headIndex < 2; ++headIndex)
 				{
+#if defined(EXPERIMENTALZERO)
+					unsigned char* src = &tracksD81[(trackIndex << 11) + (headIndex << 10)];
+#else
 					unsigned char* src = tracksD81[trackIndex][headIndex];
+#endif
 					src += 32;
 					for (physicalSectorIndex = 0; physicalSectorIndex < physicalSectors; ++physicalSectorIndex)
 					{

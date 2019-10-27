@@ -146,6 +146,33 @@ public:
 
 	inline bool IsD81() const { return diskType == D81; }
 	inline bool IsD71() const { return diskType == D71; }
+
+#if defined(EXPERIMENTALZERO)
+	inline unsigned char GetD81Byte(unsigned track, unsigned headIndex, unsigned headPos) const { return tracksD81[(track << 14) + (headIndex << 13) + headPos]; }
+	inline void SetD81Byte(unsigned track, unsigned headIndex, unsigned headPos, unsigned char data)
+	{
+		if (tracksD81[(track << 14) + (headIndex << 13) + headPos] != data)
+		{
+			tracksD81[(track << 14) + (headIndex << 13) + headPos] = data;
+			trackDirty[track] = true;
+			trackUsed[track] = true;
+			dirty = true;
+		}
+	}
+
+	inline bool IsD81ByteASync(unsigned track, unsigned headIndex, unsigned headPos) const
+	{ 
+		return (trackD81SyncBits[(track << 11) + (headIndex << 10) + (headPos >> 3)] & (1 << (headPos & 7))) != 0;
+	}
+	inline void SetD81SyncBit(unsigned track, unsigned headIndex, unsigned headPos, bool sync)
+	{
+		if (sync)
+			trackD81SyncBits[(track << 11) + (headIndex << 10) + (headPos >> 3)] |= 1 << (headPos & 7);
+		else
+			trackD81SyncBits[(track << 11) + (headIndex << 10) + (headPos >> 3)] &= ~(1 << (headPos & 7));
+
+	}
+#else
 	inline unsigned char GetD81Byte(unsigned track, unsigned headIndex, unsigned headPos) const { return tracksD81[track][headIndex][headPos]; }
 	inline void SetD81Byte(unsigned track, unsigned headIndex, unsigned headPos, unsigned char data)
 	{
@@ -170,6 +197,7 @@ public:
 			trackD81SyncBits[track][headIndex][headPos >> 3] &= ~(1 << (headPos & 7));
 
 	}
+#endif
 
 	static DiskType GetDiskImageTypeViaExtention(const char* diskImageName);
 	static bool IsDiskImageExtention(const char* diskImageName);
@@ -192,10 +220,11 @@ public:
 	{
 #if defined(EXPERIMENTALZERO)
 		unsigned char tracks[HALF_TRACK_COUNT * MAX_TRACK_LENGTH];
+		unsigned char tracksD81[HALF_TRACK_COUNT * 2 * MAX_TRACK_LENGTH];
 #else
 		unsigned char tracks[HALF_TRACK_COUNT][MAX_TRACK_LENGTH];
-#endif
 		unsigned char tracksD81[HALF_TRACK_COUNT][2][MAX_TRACK_LENGTH];
+#endif
 	};
 
 	bool WriteD64(char* name = 0);
@@ -246,7 +275,11 @@ private:
 	union
 	{
 		unsigned char trackDensity[HALF_TRACK_COUNT];
+#if defined(EXPERIMENTALZERO)
+		unsigned char trackD81SyncBits[HALF_TRACK_COUNT * 2 * (MAX_TRACK_LENGTH >> 3)];
+#else
 		unsigned char trackD81SyncBits[HALF_TRACK_COUNT][2][MAX_TRACK_LENGTH >> 3];
+#endif
 	};
 	bool trackDirty[HALF_TRACK_COUNT];
 	bool trackUsed[HALF_TRACK_COUNT];

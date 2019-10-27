@@ -1091,7 +1091,158 @@ EXIT_TYPE Emulate1541(FileBrowser* fileBrowser)
 }
 #endif
 
-#if defined(PI1581SUPPORT)
+//#if defined(PI1581SUPPORT)
+#if defined(EXPERIMENTALZERO)
+EXIT_TYPE Emulate1581(FileBrowser* fileBrowser)
+{
+	EXIT_TYPE exitReason = EXIT_UNKNOWN;
+	bool oldLED = false;
+	unsigned ctBefore = 0;
+	unsigned ctAfter = 0;
+	int cycleCount = 0;
+	unsigned caddyIndex;
+	int headSoundCounter = 0;
+	int headSoundFreqCounter = 0;
+	//			const int headSoundFreq = 833;	// 1200Hz = 1/1200 * 10^6;
+	const int headSoundFreq = 1000000 / options.SoundOnGPIOFreq();	// 1200Hz = 1/1200 * 10^6;
+	unsigned int oldTrack;
+	int resetCount = 0;
+
+	unsigned numberOfImages = diskCaddy.GetNumberOfImages();
+	unsigned numberOfImagesMax = numberOfImages;
+	if (numberOfImagesMax > 10)
+		numberOfImagesMax = 10;
+
+	diskCaddy.Display();
+
+	inputMappings->directDiskSwapRequest = 0;
+	// Force an update on all the buttons now before we start emulation mode. 
+	IEC_Bus::ReadBrowseMode();
+
+	DataBusReadFn dataBusRead = read6502_1581;
+	DataBusWriteFn dataBusWrite = write6502_1581;
+	pi1581.m6502.SetBusFunctions(dataBusRead, dataBusWrite);
+
+	IEC_Bus::CIA = &pi1581.CIA;
+	IEC_Bus::port = pi1581.CIA.GetPortB();
+	pi1581.Reset();	// will call IEC_Bus::Reset();
+
+	ctBefore = read32(ARM_SYSTIMER_CLO);
+
+	//resetWhileEmulating = false;
+	selectedViaIECCommands = false;
+
+	oldTrack = pi1581.wd177x.GetCurrentTrack();
+
+	while (exitReason == EXIT_UNKNOWN)
+	{
+		for (int cycle2MHz = 0; cycle2MHz < 2; ++cycle2MHz)
+		{
+			IEC_Bus::ReadEmulationMode1581();
+			if (pi1581.m6502.SYNC())	// About to start a new instruction.
+			{
+				pc = pi1581.m6502.GetPC();
+				// See if the emulated cpu is executing CD:_ (ie back out of emulated image)
+				if (snoopIndex == 0 && (pc == SNOOP_CD_CBM1581)) snoopPC = pc;
+
+				if (pc == snoopPC)
+				{
+					if (Snoop(pi1581.m6502.GetA()))
+					{
+						emulating = IEC_COMMANDS;
+						exitReason = EXIT_CD;
+					}
+				}
+			}
+			pi1581.m6502.Step();
+			pi1581.Update();
+		}
+
+		IEC_Bus::RefreshOuts1581();	// Now output all outputs.
+
+		//if (cycleCount >= FAST_BOOT_CYCLES)	// cycleCount is used so we can quickly get through 1541's self test code. This will make the emulated 1541 responsive to commands asap. During this time we don't need to set outputs.
+		{
+			IEC_Bus::OutputLED = pi1581.IsLEDOn();
+			if (IEC_Bus::OutputLED ^ oldLED)
+			{
+				SetACTLed(IEC_Bus::OutputLED);
+				oldLED = IEC_Bus::OutputLED;
+			}
+		}
+
+		bool exitEmulation = inputMappings->Exit();
+		bool exitDoAutoLoad = inputMappings->AutoLoad();
+
+		bool reset = IEC_Bus::IsReset();
+		if (reset)
+			resetCount++;
+		else
+			resetCount = 0;
+
+		if ((emulating == IEC_COMMANDS)|| (resetCount > 10) || exitEmulation || exitDoAutoLoad)
+		{
+			if (reset)
+				exitReason = EXIT_RESET;
+			if (exitDoAutoLoad)
+				exitReason = EXIT_AUTOLOAD;
+		}
+
+		if (cycleCount < FAST_BOOT_CYCLES)	// cycleCount is used so we can quickly get through 1541's self test code. This will make the emulated 1541 responsive to commands asap.
+		{
+			cycleCount++;
+			ctAfter = read32(ARM_SYSTIMER_CLO);
+		}
+		else
+		{
+			do	// Sync to the 1MHz clock
+			{
+				ctAfter = read32(ARM_SYSTIMER_CLO);
+				unsigned ct = ctAfter - ctBefore;
+				if (ct > 1)
+				{
+					// If this ever occurs then we have taken too long (ie >1us) and lost a cycle.
+					// Cycle accuracy is now in jeopardy. If this occurs during critical communication loops then emulation can fail!
+					//DEBUG_LOG("!");
+				}
+			} while (ctAfter == ctBefore);
+		}
+		ctBefore = ctAfter;
+
+		if (numberOfImages > 1)
+		{
+			bool nextDisk = inputMappings->NextDisk();
+			bool prevDisk = inputMappings->PrevDisk();
+			if (nextDisk)
+			{
+				pi1581.Insert(diskCaddy.PrevDisk());
+			}
+			else if (prevDisk)
+			{
+				pi1581.Insert(diskCaddy.NextDisk());
+			}
+			else if (inputMappings->directDiskSwapRequest != 0)
+			{
+				for (caddyIndex = 0; caddyIndex < numberOfImagesMax; ++caddyIndex)
+				{
+					if (inputMappings->directDiskSwapRequest & (1 << caddyIndex))
+					{
+						DiskImage* diskImage = diskCaddy.SelectImage(caddyIndex);
+						if (diskImage && diskImage != pi1581.GetDiskImage())
+						{
+							pi1581.Insert(diskImage);
+							break;
+						}
+					}
+				}
+				inputMappings->directDiskSwapRequest = 0;
+			}
+		}
+
+	}
+	return exitReason;
+}
+
+#else
 EXIT_TYPE Emulate1581(FileBrowser* fileBrowser)
 {
 	EXIT_TYPE exitReason = EXIT_UNKNOWN;
