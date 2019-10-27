@@ -139,7 +139,7 @@ void InputMappings::WaitForClearButtons()
 void InputMappings::CheckButtonsEmulationMode()
 {
 	buttonFlags = 0;
-
+#if not defined(EXPERIMENTALZERO)
 	if (IEC_Bus::GetInputButtonRepeating(INPUT_BUTTON_UP))
 		SetButtonFlag(NEXT_FLAG);
 	else if (IEC_Bus::GetInputButtonRepeating(INPUT_BUTTON_DOWN))
@@ -154,6 +154,14 @@ void InputMappings::CheckButtonsEmulationMode()
 			SetButtonFlag(ESC_FLAG);
 		enterButtonPressedPrev = enterButtonPressed;
 	}
+#else
+	if (IEC_Bus::GetInputButtonPressed(INPUT_BUTTON_ENTER))
+		SetButtonFlag(ESC_FLAG);
+	else if (IEC_Bus::GetInputButtonPressed(INPUT_BUTTON_UP))
+		SetButtonFlag(NEXT_FLAG);
+	else if (IEC_Bus::GetInputButtonPressed(INPUT_BUTTON_DOWN))
+		SetButtonFlag(PREV_FLAG);
+#endif
 }
 
 
