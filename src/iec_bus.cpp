@@ -17,10 +17,11 @@
 // along with Pi1541. If not, see <http://www.gnu.org/licenses/>.
 
 #include "iec_bus.h"
+#include "InputMappings.h"
 
 //#define REAL_XOR 1
 
-static int buttonCount = sizeof(ButtonPinFlags) / sizeof(unsigned);
+int IEC_Bus::buttonCount = sizeof(ButtonPinFlags) / sizeof(unsigned);
 
 u32 IEC_Bus::oldClears = 0;
 u32 IEC_Bus::oldSets = 0;
@@ -76,20 +77,19 @@ unsigned IEC_Bus::gplev0;
 //ROTARY: Added for rotary encoder support - 09/05/2019 by Geo...
 RotaryEncoder IEC_Bus::rotaryEncoder;
 bool IEC_Bus::rotaryEncoderEnable;
+//ROTARY: Added for rotary encoder inversion (Issue#185) - 08/13/2020 by Geo...
+bool IEC_Bus::rotaryEncoderInvert;
 
-//ROTARY: Modified for rotary encoder support - 09/05/2019 by Geo...
-void IEC_Bus::ReadBrowseMode(void)
+void IEC_Bus::ReadGPIOUserInput()
 {
-	gplev0 = read32(ARM_GPIO_GPLEV0);
-
+	//ROTARY: Added for rotary encoder support - 09/05/2019 by Geo...
 	if (IEC_Bus::rotaryEncoderEnable == true)
 	{
-
-		int indexEnter = 0;
-		int indexUp = 1;
-		int indexDown = 2;
-		int indexBack = 3;
-		int indexInsert = 4;
+		int indexEnter = InputMappings::INPUT_BUTTON_ENTER;
+		int indexUp = InputMappings::INPUT_BUTTON_UP;
+		int indexDown = InputMappings::INPUT_BUTTON_DOWN;
+		int indexBack = InputMappings::INPUT_BUTTON_BACK;
+		int indexInsert = InputMappings::INPUT_BUTTON_INSERT;
 
 		//Poll the rotary encoder
 		//
@@ -124,7 +124,6 @@ void IEC_Bus::ReadBrowseMode(void)
 
 		UpdateButton(indexBack, gplev0);
 		UpdateButton(indexInsert, gplev0);
-
 	}
 	else // Unmolested original logic
 	{
@@ -136,6 +135,14 @@ void IEC_Bus::ReadBrowseMode(void)
 		}
 
 	}
+}
+
+
+//ROTARY: Modified for rotary encoder support - 09/05/2019 by Geo...
+void IEC_Bus::ReadBrowseMode(void)
+{
+	gplev0 = read32(ARM_GPIO_GPLEV0);
+	ReadGPIOUserInput();
 
 	bool ATNIn = (gplev0 & PIGPIO_MASK_IN_ATN) == (invertIECInputs ? PIGPIO_MASK_IN_ATN : 0);
 	if (PI_Atn != ATNIn)
@@ -170,15 +177,6 @@ void IEC_Bus::ReadBrowseMode(void)
 	}
 
 	Resetting = !ignoreReset && ((gplev0 & PIGPIO_MASK_IN_RESET) == (invertIECInputs ? PIGPIO_MASK_IN_RESET : 0));
-}
-
-void IEC_Bus::ReadButtonsEmulationMode(void)
-{
-	int buttonIndex;
-	for (buttonIndex = 0; buttonIndex < 3; ++buttonIndex)
-	{
-		UpdateButton(buttonIndex, gplev0);
-	}
 }
 
 void IEC_Bus::ReadEmulationMode1541(void)
@@ -281,8 +279,6 @@ void IEC_Bus::ReadEmulationMode1581(void)
 {
 	IOPort* portB = 0;
 	gplev0 = read32(ARM_GPIO_GPLEV0);
-
-	ReadButtonsEmulationMode();
 
 	portB = port;
 
@@ -388,20 +384,12 @@ void IEC_Bus::RefreshOuts1541(void)
 
 	if (OutputLED) set |= 1 << PIGPIO_OUT_LED;
 	else clear |= 1 << PIGPIO_OUT_LED;
-#if not defined(EXPERIMENTALZERO)
+
 	if (OutputSound) set |= 1 << PIGPIO_OUT_SOUND;
 	else clear |= 1 << PIGPIO_OUT_SOUND;
-#endif
-	if (oldClears != clear)
-	{
-		write32(ARM_GPIO_GPCLR0, clear);
-		oldClears = clear;
-	}
-	if (oldSets != set)
-	{
-		write32(ARM_GPIO_GPSET0, set);
-		oldSets = set;
-	}
+
+	write32(ARM_GPIO_GPCLR0, clear);
+	write32(ARM_GPIO_GPSET0, set);
 }
 
 void IEC_Bus::PortB_OnPortOut(void* pUserData, unsigned char status)

@@ -36,14 +36,7 @@
 #define DIR_ENTRY_NAME_LENGTH 18-2
 
 static const unsigned char HALF_TRACK_COUNT = 84;
-static const unsigned char D71_HALF_TRACK_COUNT = 70;
 static const unsigned char D81_TRACK_COUNT = 80;
-static const unsigned short GCR_SYNC_LENGTH = 5;
-static const unsigned short GCR_HEADER_LENGTH = 10;
-static const unsigned short GCR_HEADER_GAP_LENGTH = 8;
-static const unsigned short GCR_SECTOR_DATA_LENGTH = 325;
-static const unsigned short GCR_SECTOR_GAP_LENGTH = 8;
-static const unsigned short GCR_SECTOR_LENGTH = GCR_SYNC_LENGTH + GCR_HEADER_LENGTH + GCR_HEADER_GAP_LENGTH + GCR_SYNC_LENGTH + GCR_SECTOR_DATA_LENGTH + GCR_SECTOR_GAP_LENGTH;	//361
 
 static const unsigned short G64_MAX_TRACK_LENGTH = 7928;
 
@@ -62,10 +55,14 @@ public:
 		LST,
 		D71,
 		D81,
+		T64,
+		PRG,
 		RAW
 	};
 
 	DiskImage();
+
+	static unsigned CreateNewDiskInRAM(const char* filenameNew, const char* ID, unsigned char* destBuffer = 0);
 
 	bool OpenD64(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
 	bool OpenG64(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
@@ -73,6 +70,8 @@ public:
 	bool OpenNBZ(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
 	bool OpenD71(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
 	bool OpenD81(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
+	bool OpenT64(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
+	bool OpenPRG(const FILINFO* fileInfo, unsigned char* diskImage, unsigned size);
 
 	void Close();
 
@@ -203,6 +202,13 @@ public:
 
 	unsigned GetHash() const { return hash; }
 
+	inline static unsigned GetSpeedZoneIndexD64(unsigned track)
+	{
+		return (track < 30) + (track < 24) + (track < 17);
+	}
+
+	static unsigned SectorsPerTrackD64(unsigned track);
+
 private:
 	void CloseD64();
 	void CloseG64();
@@ -210,11 +216,13 @@ private:
 	void CloseNBZ();
 	void CloseD71();
 	void CloseD81();
+	void CloseT64();
 
 	bool WriteNIB();
 	bool WriteNBZ();
 	bool WriteD71();
 	bool WriteD81();
+	bool WriteT64(char* name = 0);
 
 	inline void TestDirty(u32 track, bool isDirty)
 	{
@@ -235,6 +243,14 @@ private:
 	void OutputD81HeaderByte(unsigned char*& dest, unsigned char byte);
 	void OutputD81DataByte(unsigned char*& src, unsigned char*& dest);
 
+	static bool AddFileToRAMD64(unsigned char* ramD64, const char* name, const unsigned char* data, unsigned length);
+	static unsigned char* RAMD64AddDirectoryEntry(unsigned char* ramD64, const char* name, const unsigned char* data, unsigned length);
+	static int RAMD64GetSectorOffset(int track, int sector);
+	static int RAMD64FreeSectors(unsigned char* ramD64);
+	static bool RAMD64FindFreeSector(bool searchForwards, unsigned char* ramD64, int lastTrackUsed, int lastSectorUsed, int& track, int& sector);
+	static bool RAMD64AllocateSector(unsigned char* ramD64, int track, int sector);
+	static bool WriteRAMD64(unsigned char* diskImage, unsigned size);
+	
 	bool readOnly;
 	bool dirty;
 	unsigned attachedImageSize;

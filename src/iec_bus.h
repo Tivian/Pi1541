@@ -19,6 +19,7 @@
 #ifndef IEC_BUS_H
 #define IEC_BUS_H
 
+#include "defs.h"
 #include "debug.h"
 #include "m6522.h"
 #include "m8520.h"
@@ -65,7 +66,7 @@
 //	- VIA's DATA IN will automatically set high and hence the DATA line will be pulled low (activated)
 // If ATN and ATNA are in sync
 //	- the output from the XOR gate will be low and the output of its inverter will go high
-//		- when this occurs the DATA line must be still able to be pulled low via the PC or VIA's inverted PB1 (DATA OUT)
+//	- when this occurs the DATA line must be still able to be pulled low via the PC or VIA's inverted PB1 (DATA OUT)
 //
 // Therefore in the same vein if PB7 is set to output it could cause the input of the XOR to be pulled low
 //
@@ -74,13 +75,13 @@
 // SRQ is a little bit different.
 // The 1581 does not pull it high. Only the 128 pulls it high.
 // 
-
+#if defined(HAS_40PINS)
 enum PIGPIO
 {
 	// Original Non-split lines
 	PIGPIO_ATN = 2,			// 3
-	PIGPIO_DATA = 18,		// 12
 	PIGPIO_CLOCK = 17,		// 11
+	PIGPIO_DATA = 18,		// 12
 	PIGPIO_SRQ = 19,		// 35
 	PIGPIO_RESET = 3,		// 5
 
@@ -116,6 +117,62 @@ enum PIGPIO
 	PIGPIO_IN_CLOCK = 26,	// 37
 	PIGPIO_IN_BUTTON1 = 27	// 13 Common
 };
+#else
+//Added GPIO bindings for Raspberry Pi 1B Rev 1/2 (only 26 I/O ports)
+enum PIGPIO
+{
+	// Original Non-split lines
+	// Raspberry Pi 1B Rev 2 has GPIO0/1 in place of GPIO2/3
+#if defined(RPI1BREV1)	
+	PIGPIO_ATN = 0,			// 3
+	PIGPIO_RESET = 1,		// 5
+#else
+	PIGPIO_ATN = 2,			// 3
+	PIGPIO_RESET = 3,		// 5
+#endif
+	PIGPIO_CLOCK = 17,		// 11
+	PIGPIO_DATA = 18,		// 12
+	PIGPIO_SRQ = 19,		// 35  not connected yet
+
+	// Pinout for those that want to split the lines (and the common ones like buttons, sound and LED)
+	// Funktion = 	GPIO	// Hardware PIN
+	// 0 IDSC				// 28
+	// 1 IDSD				// 27
+	// 2 I2C_SDA			// 3
+	// 3 I2C_CLK			// 5
+	PIGPIO_IN_BUTTON4 = 4,	// 07 Common
+	//GPIO = 5,				// 29 Common
+	//PIGPIO_OUT_RESET = 6,	// 31
+	PIGPIO_OUT_SPI0_RS = 6,	// 31 not connected yet
+	// 7 SPI0_CS1			// 26
+	PIGPIO_IN_BUTTON5 =  9,	// 21
+	PIGPIO_IN_RESET = 20,	// 38
+	PIGPIO_IN_CLOCK = 10,	// 19
+	PIGPIO_OUT_LED = 7,	    // 26
+	PIGPIO_OUT_ATN = 12,	// 32 not connected yet
+	PIGPIO_OUT_SOUND = 11,  // 23
+	// 14 TX				// 8
+	// 15 RX  				// 10
+	//GPIO = 16,			// 36 Common
+	PIGPIO_OUT_CLOCK = 17,	// 11
+	PIGPIO_OUT_DATA = 18,	// 12
+	PIGPIO_OUT_SRQ = 19,	// 35 not connected yet
+	//GPIO 20,				// 38
+	PIGPIO_IN_SRQ = 21,		// 40 not connected yet
+	PIGPIO_IN_BUTTON2 = 22,	// 15 Common
+	PIGPIO_IN_BUTTON3 = 23,	// 16 Common
+	PIGPIO_IN_ATN = 24,		// 18
+	PIGPIO_IN_DATA = 25,	// 22
+	//GPIO 26,				// 37
+#if defined(RPI1BREV1)
+	PIGPIO_IN_BUTTON1 = 21	// 13 Common
+#else
+	PIGPIO_IN_BUTTON1 = 27	// 13 Common
+#endif
+};
+#endif
+
+
 
 enum PIGPIOMasks
 {
@@ -249,11 +306,13 @@ public:
 			// This means that when any pin is turn to output it will output a 0 and pull lines low (ie an activation state on the IEC bus)
 			// Note: on the IEC bus you never output a 1 you simply tri state and it will be pulled up to a 1 (ie inactive state on the IEC bus) if no one else is pulling it low.
 
-			myOutsGPFSEL0 = read32(ARM_GPIO_GPFSEL0);
-			myOutsGPFSEL1 = read32(ARM_GPIO_GPFSEL1);
+			//myOutsGPFSEL0 = read32(ARM_GPIO_GPFSEL0);
+			//myOutsGPFSEL1 = read32(ARM_GPIO_GPFSEL1);
 
-			myOutsGPFSEL1 |= (1 << ((PIGPIO_OUT_LED - 10) * 3));
-			myOutsGPFSEL1 |= (1 << ((PIGPIO_OUT_SOUND - 10) * 3));
+			//myOutsGPFSEL1 |= (1 << ((PIGPIO_OUT_LED - 10) * 3));
+			//myOutsGPFSEL1 |= (1 << ((PIGPIO_OUT_SOUND - 10) * 3));
+			RPI_SetGpioPinFunction((rpi_gpio_pin_t)PIGPIO_OUT_SOUND, FS_OUTPUT);
+			RPI_SetGpioPinFunction((rpi_gpio_pin_t)PIGPIO_OUT_LED, FS_OUTPUT);
 		}
 		else
 		{
@@ -290,7 +349,6 @@ public:
 		write32(PWM_CTL, PWM_USEF2 + PWM_PWEN2 + PWM_USEF1 + PWM_PWEN1 + PWM_CLRF1);
 #endif
 
-		int buttonCount = sizeof(ButtonPinFlags) / sizeof(unsigned);
 		for (index = 0; index < buttonCount; ++index)
 		{
 			InputButton[index] = false;
@@ -316,7 +374,15 @@ public:
 		//ROTARY: Added for rotary encoder support - 09/05/2019 by Geo...
 		if (IEC_Bus::rotaryEncoderEnable == true)
 		{
-			IEC_Bus::rotaryEncoder.Initialize(RPI_GPIO22, RPI_GPIO23, RPI_GPIO27);
+			//ROTARY: Added for rotary encoder inversion (Issue#185) - 08/13/2020 by Geo...
+			if (IEC_Bus::rotaryEncoderInvert == true)
+			{
+				IEC_Bus::rotaryEncoder.Initialize(RPI_GPIO23, RPI_GPIO22, RPI_GPIO27);
+			}
+			else
+			{
+				IEC_Bus::rotaryEncoder.Initialize(RPI_GPIO22, RPI_GPIO23, RPI_GPIO27);
+			}
 		}
 
 	}
@@ -334,7 +400,7 @@ public:
 	}
 #endif
 
-	static inline void UpdateButton(int index, unsigned gplev0)
+	static void UpdateButton(int index, unsigned gplev0)
 	{
 		bool inputcurrent = (gplev0 & ButtonPinFlags[index]) == 0;
 
@@ -409,8 +475,8 @@ public:
 
 
 	static void ReadBrowseMode(void);
+	static void ReadGPIOUserInput(void);
 	static void ReadEmulationMode1541(void);
-	static void ReadButtonsEmulationMode(void);
 	static void ReadEmulationMode1581(void);
 
 	static void WaitUntilReset(void)
@@ -609,6 +675,12 @@ public:
 		rotaryEncoderEnable = value;
 	}
 
+	//ROTARY: Added for rotary encoder inversion (Issue#185) - 08/13/2020 by Geo...
+	static inline void SetRotaryEncoderInvert(bool value)
+	{
+		rotaryEncoderInvert = value;
+	}
+
 	// CA1 input ATN
 	// If CA1 is ever set to output
 	//	- CA1 will start to drive pb7
@@ -664,6 +736,8 @@ private:
 	static bool SRQSetToOut;
 	static bool Resetting;
 
+	static int buttonCount;
+
 	static u32 myOutsGPFSEL0;
 	static u32 myOutsGPFSEL1;
 	static bool InputButton[5];
@@ -676,6 +750,8 @@ private:
 	//ROTARY: Added for rotary encoder support - 09/05/2019 by Geo...
 	static RotaryEncoder rotaryEncoder;
 	static bool rotaryEncoderEnable;
+	//ROTARY: Added for rotary encoder inversion (Issue#185) - 08/13/2020 by Geo...
+	static bool rotaryEncoderInvert;
 
 };
 #endif

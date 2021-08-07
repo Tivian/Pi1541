@@ -27,10 +27,10 @@
 #define MAX_HALFTRACKS_1571 (MAX_TRACKS_1571 * 2)
 
 /* D64 constants */
-#define BLOCKSONDISK 683
-#define BLOCKSEXTRA 85
+#define BLOCKSONDISK (17*21 + 7*19 + 6*18 + 5*17)
+#define BLOCKSEXTRA (5*17 + 2*17)
 #define MAXBLOCKSONDISK (BLOCKSONDISK+BLOCKSEXTRA)
-#define MAX_TRACK_D64 40
+#define MAX_TRACK_D64 42
 
 /* G64 constants (only needed for current VICE support */
 #define G64_TRACK_MAXLEN 7928
@@ -135,7 +135,7 @@ size_t find_nondos_track_cycle(BYTE ** cycle_start, BYTE ** cycle_stop,
 BYTE convert_GCR_sector(BYTE * gcr_start, BYTE * gcr_end,
   BYTE * d64_sector, int track, int sector, BYTE * id);
 void convert_sector_to_GCR(BYTE * buffer, BYTE * ptr,
-  int track, int sector, BYTE * diskID, int error);
+  int track, int sector, BYTE * diskID, int error, int sectorSize);
 BYTE * find_sector_gap(BYTE * work_buffer, int tracklen, size_t * p_sectorlen);
 BYTE * find_sector0(BYTE * work_buffer, int tracklen, size_t * p_sectorlen);
 int extract_GCR_track(BYTE * destination, BYTE * source, int * align,

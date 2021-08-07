@@ -128,6 +128,7 @@ Options::Options(void)
 	, disableSD2IECCommands(0)
 	, supportUARTInput(0)
 	, graphIEC(0)
+	, displayTracks(0)
 	, quickBoot(0)
 	, showOptions(0)
 	, displayPNGIcons(0)
@@ -158,7 +159,7 @@ Options::Options(void)
         , buttonBack(4)
         , buttonInsert(5)
 	, rotaryEncoderEnable(0) //ROTARY:
-
+	, rotaryEncoderInvert(0) //ROTARY:
 {
 	autoMountImageName[0] = 0;
 	strcpy(ROMFontName, "chargen");
@@ -218,6 +219,7 @@ void Options::Process(char* buffer)
 		ELSE_CHECK_DECIMAL_OPTION(disableSD2IECCommands)
 		ELSE_CHECK_DECIMAL_OPTION(supportUARTInput)
 		ELSE_CHECK_DECIMAL_OPTION(graphIEC)
+		ELSE_CHECK_DECIMAL_OPTION(displayTracks)
 		ELSE_CHECK_DECIMAL_OPTION(quickBoot)
 		ELSE_CHECK_DECIMAL_OPTION(showOptions)
 		ELSE_CHECK_DECIMAL_OPTION(displayPNGIcons)
@@ -249,6 +251,7 @@ void Options::Process(char* buffer)
 		ELSE_CHECK_DECIMAL_OPTION(buttonBack)
 		ELSE_CHECK_DECIMAL_OPTION(buttonInsert)
 		ELSE_CHECK_DECIMAL_OPTION(rotaryEncoderEnable) //ROTARY:
+		ELSE_CHECK_DECIMAL_OPTION(rotaryEncoderInvert) //ROTARY:
 		else if ((strcasecmp(pOption, "AutoBaseName") == 0))
 		{
 			strncpy(autoBaseName, pValue, 255);
@@ -365,7 +368,10 @@ const char* Options::GetRomName(int index) const
 
 const char* Options::GetRomName1581() const
 {
-	return ROMName1581;
+	if (ROMName1581[0] == 0)
+		return "1581-rom.318045-02.bin";
+	else
+		return ROMName1581;
 }
 
 DiskImage::DiskType Options::GetNewDiskType() const

@@ -124,6 +124,7 @@ protected:
 		u32 bytesSent;
 		u32 open : 1;
 		u32 writing : 1;
+		u32 fileSize;
 
 		void Close();
 		bool WriteFull() const { return cursor >= sizeof(buffer); }
@@ -170,6 +171,8 @@ protected:
 	bool SendBuffer(Channel& channel, bool eoi);
 
 	u8 GetFilenameCharacter(u8 value);
+
+	int WriteNewDiskInRAM(char* filenameNew, bool automount, unsigned length);
 
 	UpdateAction updateAction;
 	u8 commandCode;
